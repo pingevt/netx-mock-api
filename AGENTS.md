@@ -56,6 +56,31 @@ curl -X POST http://localhost:3000/api/rpc \
 
 Add entries to `data/assets.js` and/or `data/folders.js`. Proxy URLs must match the pattern `/api/file/asset/:id/thumbnail` (not custom paths). Restart the server to reload.
 
+## Commit Convention
+
+This repo follows [Conventional Commits](https://www.conventionalcommits.org/).
+
+```
+<type>(<scope>): <short summary>
+```
+
+| Type | Use for |
+|------|---------|
+| `feat` | New endpoint, method, or seed data |
+| `fix` | Bug fix |
+| `docs` | Documentation / AGENTS.md / README only |
+| `refactor` | Code restructure, no behavior change |
+| `chore` | Dependencies, tooling |
+
+Optional scopes: `rpc`, `files`, `store`, `data`, `auth`
+
+Examples:
+```
+feat(data): add 5 landscape assets to seed data
+fix(files): remove auth requirement from file routes
+feat(rpc): implement setAssetAttributes method
+```
+
 ## Paired With
 
 `netx_media_source` Drupal module at `/Users/peteinge/Modules/netx_media_source`. Configure the `NetxSource` entity with:
