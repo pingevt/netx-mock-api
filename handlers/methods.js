@@ -76,6 +76,7 @@ function addAssetToFolder(params) {
   if (!alreadyIn) {
     asset.folders = asset.folders || [];
     asset.folders.push({ id: folder.id, name: folder.name, description: folder.description, path: folder.path, children: null });
+    store.persist();
   }
   return asset;
 }
@@ -88,6 +89,7 @@ function removeAssetFromFolder(params) {
   const asset = store.getAssetById(assetId);
   if (!asset) throw new Error(`Asset ${assetId} not found`);
   asset.folders = (asset.folders || []).filter(f => f.id !== Number(folderId));
+  store.persist();
   return asset;
 }
 

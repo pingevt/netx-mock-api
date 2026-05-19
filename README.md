@@ -190,9 +190,10 @@ Root (1)
 | `PORT` | `3000` | Server port |
 | `NETX_API_TOKEN` | `dev-token-1234` | Expected API token |
 | `STRICT_AUTH` | `false` | If `true`, reject requests with wrong token |
+| `PERSIST_DATA_DIR` | `.data` in project root | Directory used to persist store state and uploaded files |
 
 ## Notes
 
-- **Data is ephemeral** — all changes reset on server restart
-- **Placeholder images** are fetched from `placehold.co` (requires internet). If offline, a 1×1 transparent PNG fallback is used
+- **Data persists across restarts** — runtime state is written to `.data/store.json`, uploads to `.data/uploads/`
+- **To reset state**, stop the server and remove `.data/`
 - The `fromjs` route in the Drupal module (`/netx-media/ajax/{mediatype}/fromjs`) is a Drupal-side endpoint — it is not part of this mock server

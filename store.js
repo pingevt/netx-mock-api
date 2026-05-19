@@ -3,20 +3,125 @@
  *
  * Loads seed data and provides mutable state so that create/update/delete
  * operations during a session are reflected in subsequent reads.
- * Data resets on server restart.
+ * State and uploaded files are also persisted to disk.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { assets } = require('./data/assets');
 const { folders } = require('./data/folders');
 const { attributeDefinitions, attributeValues, collections } = require('./data/attributes');
 
-// Deep clone seed data so mutations don't corrupt the original require cache
+const PERSIST_DIR = process.env.PERSIST_DATA_DIR || path.join(__dirname, '.data');
+const UPLOAD_DIR = path.join(PERSIST_DIR, 'uploads');
+const STATE_FILE = path.join(PERSIST_DIR, 'store.json');
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function ensurePersistenceDirs() {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+function loadInitialState() {
+  const fallback = {
+    assets: deepClone(assets),
+    folders: deepClone(folders),
+    attributeDefinitions: deepClone(attributeDefinitions),
+    attributeValues: deepClone(attributeValues),
+    collections: deepClone(collections),
+    uploadedFiles: new Map(),
+  };
+
+  try {
+    ensurePersistenceDirs();
+    if (!fs.existsSync(STATE_FILE)) {
+      return fallback;
+    }
+
+    const raw = fs.readFileSync(STATE_FILE, 'utf8');
+    const persisted = JSON.parse(raw);
+
+    const uploadedFiles = new Map();
+    for (const fileMeta of persisted.uploadedFiles || []) {
+      const filePath = path.join(UPLOAD_DIR, fileMeta.diskFile || `${fileMeta.assetId}.bin`);
+      if (!fs.existsSync(filePath)) {
+        continue;
+      }
+
+      uploadedFiles.set(Number(fileMeta.assetId), {
+        buffer: fs.readFileSync(filePath),
+        mimeType: fileMeta.mimeType || 'application/octet-stream',
+        fileName: fileMeta.fileName || `asset-${fileMeta.assetId}`,
+        diskFile: fileMeta.diskFile || `${fileMeta.assetId}.bin`,
+      });
+    }
+
+    return {
+      assets: Array.isArray(persisted.assets) ? persisted.assets : fallback.assets,
+      folders: Array.isArray(persisted.folders) ? persisted.folders : fallback.folders,
+      attributeDefinitions: Array.isArray(persisted.attributeDefinitions) ? persisted.attributeDefinitions : fallback.attributeDefinitions,
+      attributeValues: persisted.attributeValues || fallback.attributeValues,
+      collections: Array.isArray(persisted.collections) ? persisted.collections : fallback.collections,
+      uploadedFiles,
+    };
+  } catch (error) {
+    console.warn(`[Store] Failed loading persisted state, using seed data: ${error.message}`);
+    return fallback;
+  }
+}
+
+const initialState = loadInitialState();
+
 const store = {
-  assets: JSON.parse(JSON.stringify(assets)),
-  folders: JSON.parse(JSON.stringify(folders)),
-  attributeDefinitions: JSON.parse(JSON.stringify(attributeDefinitions)),
-  attributeValues: JSON.parse(JSON.stringify(attributeValues)),
-  collections: JSON.parse(JSON.stringify(collections)),
+  assets: initialState.assets,
+  uploadedFiles: initialState.uploadedFiles,
+  folders: initialState.folders,
+  attributeDefinitions: initialState.attributeDefinitions,
+  attributeValues: initialState.attributeValues,
+  collections: initialState.collections,
+
+  persist() {
+    this._persistState();
+  },
+
+  _persistState() {
+    try {
+      ensurePersistenceDirs();
+
+      const uploadedFiles = [];
+      for (const [assetId, fileData] of this.uploadedFiles.entries()) {
+        const diskFile = fileData.diskFile || `${assetId}.bin`;
+        const diskPath = path.join(UPLOAD_DIR, diskFile);
+
+        if (fileData.buffer) {
+          fs.writeFileSync(diskPath, fileData.buffer);
+        }
+
+        uploadedFiles.push({
+          assetId,
+          mimeType: fileData.mimeType || 'application/octet-stream',
+          fileName: fileData.fileName || `asset-${assetId}`,
+          diskFile,
+        });
+      }
+
+      fs.writeFileSync(
+        STATE_FILE,
+        JSON.stringify({
+          assets: this.assets,
+          folders: this.folders,
+          attributeDefinitions: this.attributeDefinitions,
+          attributeValues: this.attributeValues,
+          collections: this.collections,
+          uploadedFiles,
+        }, null, 2)
+      );
+    } catch (error) {
+      console.warn(`[Store] Failed to persist state: ${error.message}`);
+    }
+  },
 
   // ── Assets ──────────────────────────────────────────────────────────────
 
@@ -83,31 +188,58 @@ const store = {
     if (data.name) this.assets[idx].name = data.name;
     if (data.fileName) this.assets[idx].fileName = data.fileName;
     this.assets[idx].modDate = Date.now();
+    this._persistState();
     return this.assets[idx];
   },
 
   deleteAsset(id) {
-    const idx = this.assets.findIndex(a => a.id === Number(id));
+    const numericId = Number(id);
+    const idx = this.assets.findIndex(a => a.id === numericId);
     if (idx === -1) return false;
+
+    const existingUpload = this.uploadedFiles.get(numericId);
+    if (existingUpload?.diskFile) {
+      const diskPath = path.join(UPLOAD_DIR, existingUpload.diskFile);
+      if (fs.existsSync(diskPath)) {
+        fs.unlinkSync(diskPath);
+      }
+    }
+
     this.assets.splice(idx, 1);
+    this.uploadedFiles.delete(numericId);
+    this._persistState();
     return true;
   },
 
   createAsset(data) {
     const maxId = Math.max(0, ...this.assets.map(a => a.id));
+    const newId = maxId + 1;
+    const fallbackFileName = data.fileName || 'new-asset.jpg';
+    const extension = fallbackFileName.includes('.') ? fallbackFileName.split('.').pop().toLowerCase() : 'jpg';
+    const width = Number.isFinite(data.width) ? data.width : null;
+    const height = Number.isFinite(data.height) ? data.height : null;
+    const folder = data.folderId ? this.getFolderById(data.folderId) : null;
     const asset = {
-      id: maxId + 1,
-      name: data.name || data.fileName?.replace(/\.[^/.]+$/, '') || 'new-asset',
-      fileName: data.fileName || 'new-asset.jpg',
+      id: newId,
+      name: data.name || fallbackFileName.replace(/\.[^/.]+$/, '') || 'new-asset',
+      fileName: fallbackFileName,
       creationDate: Date.now(),
       importDate: Date.now(),
       modDate: Date.now(),
-      file: { name: data.fileName, size: 0, width: null, height: null, checksum: '', url: `/file/asset/${maxId + 1}` },
+      file: {
+        name: fallbackFileName,
+        size: Number(data.size) || 0,
+        width,
+        height,
+        checksum: data.checksum || '',
+        url: `/api/file/asset/${newId}`,
+      },
       proxies: [
-        { name: 'Thumbnail', file: { name: `${data.fileName}-thumbnail.jpg`, size: 0, width: 150, height: 150, url: `/view/0000/t_${maxId + 1}` } },
-        { name: 'Preview',   file: { name: `${data.fileName}-preview.jpg`,   size: 0, width: 500, height: 500, url: `/view/0000/p_${maxId + 1}` } },
+        { name: 'Thumbnail', file: { name: `${assetFileBaseName(fallbackFileName)}-thumbnail.${extension}`, size: 0, width: 150, height: 150, url: `/api/file/asset/${newId}/thumbnail` } },
+        { name: 'Preview',   file: { name: `${assetFileBaseName(fallbackFileName)}-preview.${extension}`, size: 0, width: 500, height: 500, url: `/api/file/asset/${newId}/preview` } },
+        { name: 'Zoom',      file: { name: `${assetFileBaseName(fallbackFileName)}-zoom.${extension}`, size: 0, width: 1200, height: 1200, url: `/api/file/asset/${newId}/zoom` } },
       ],
-      folders: data.folderId ? [{ id: data.folderId, name: '', path: '' }] : [],
+      folders: folder ? [{ id: folder.id, name: folder.name, path: folder.path }] : [],
       attributes: {},
       versions: null,
       permissions: { read: true, write: true, delete: true },
@@ -116,7 +248,32 @@ const store = {
       relatedAssets: null,
     };
     this.assets.push(asset);
+
+    if (data.buffer) {
+      this.uploadedFiles.set(newId, {
+        buffer: data.buffer,
+        mimeType: data.mimeType || 'application/octet-stream',
+        fileName: fallbackFileName,
+        diskFile: `${newId}.bin`,
+      });
+    }
+
+    this._persistState();
+
     return asset;
+  },
+
+  getUploadedFile(assetId) {
+    return this.uploadedFiles.get(Number(assetId)) || null;
+  },
+
+  setUploadedFile(assetId, fileData) {
+    const numericId = Number(assetId);
+    this.uploadedFiles.set(numericId, {
+      ...fileData,
+      diskFile: `${numericId}.bin`,
+    });
+    this._persistState();
   },
 
   setAssetAttributes(id, attributes) {
@@ -124,6 +281,7 @@ const store = {
     if (!asset) return false;
     Object.assign(asset.attributes, attributes);
     asset.modDate = Date.now();
+    this._persistState();
     return true;
   },
 
@@ -158,6 +316,7 @@ const store = {
       children: { assetCount: 0, folderCount: 0 },
     };
     this.folders.push(folder);
+    this._persistState();
     return folder;
   },
 
@@ -166,6 +325,7 @@ const store = {
     if (idx === -1) return null;
     if (data.name) this.folders[idx].name = data.name;
     if (data.description !== undefined) this.folders[idx].description = data.description;
+    this._persistState();
     return this.folders[idx];
   },
 
@@ -173,6 +333,7 @@ const store = {
     const idx = this.folders.findIndex(f => f.id === Number(id));
     if (idx === -1) return false;
     this.folders.splice(idx, 1);
+    this._persistState();
     return true;
   },
 
@@ -192,6 +353,7 @@ const store = {
       permissions: { read: true, write: true, delete: true },
     };
     this.collections.push(col);
+    this._persistState();
     return col;
   },
 
@@ -201,6 +363,7 @@ const store = {
     if (data.title) col.title = data.title;
     col.assetIds = [...assetIds];
     col.itemCount = assetIds.length;
+    this._persistState();
     return col;
   },
 
@@ -208,6 +371,7 @@ const store = {
     const idx = this.collections.findIndex(c => c.id === Number(id));
     if (idx === -1) return false;
     this.collections.splice(idx, 1);
+    this._persistState();
     return true;
   },
 
@@ -217,5 +381,9 @@ const store = {
     return this.getAssetsByIds(col.assetIds);
   },
 };
+
+function assetFileBaseName(fileName) {
+  return fileName.replace(/\.[^/.]+$/, '');
+}
 
 module.exports = store;

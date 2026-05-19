@@ -13,11 +13,26 @@
 
 const express = require('express');
 const router = express.Router();
+const sharp = require('sharp');
 const store = require('../store');
 const imageGenerator = require('./imageGenerator');
 
 function getProxyFile(asset, proxyName) {
   return asset.proxies?.find(p => p.name === proxyName)?.file || null;
+}
+
+async function sendUploadedImageVariant(res, uploadedFile, width, height) {
+  if (!width || !height) {
+    res.setHeader('Content-Type', uploadedFile.mimeType || 'application/octet-stream');
+    return res.send(uploadedFile.buffer);
+  }
+
+  const resizedBuffer = await sharp(uploadedFile.buffer)
+    .resize(width, height, { fit: 'inside', withoutEnlargement: true })
+    .toBuffer();
+
+  res.setHeader('Content-Type', uploadedFile.mimeType || 'image/png');
+  return res.send(resizedBuffer);
 }
 
 // GET /api/file/asset/:id
@@ -26,6 +41,12 @@ router.get('/asset/:id', async (req, res) => {
   if (!asset) return res.status(404).json({ error: 'Asset not found' });
 
   try {
+    const uploadedFile = store.getUploadedFile(req.params.id);
+    if (uploadedFile) {
+      res.setHeader('Content-Type', uploadedFile.mimeType || 'application/octet-stream');
+      return res.send(uploadedFile.buffer);
+    }
+
     const { width = 800, height = 600 } = asset.file || {};
     const buffer = await imageGenerator.generateImage(
       parseInt(req.params.id),
@@ -46,6 +67,12 @@ router.get('/asset/:id/thumbnail', async (req, res) => {
   if (!asset) return res.status(404).json({ error: 'Asset not found' });
 
   try {
+    const uploadedFile = store.getUploadedFile(req.params.id);
+    const proxy = getProxyFile(asset, 'Thumbnail');
+    if (uploadedFile) {
+      return await sendUploadedImageVariant(res, uploadedFile, proxy?.width || 150, proxy?.height || 150);
+    }
+
     const buffer = await imageGenerator.getImageForProxy(
       parseInt(req.params.id),
       'Thumbnail',
@@ -65,6 +92,12 @@ router.get('/asset/:id/preview', async (req, res) => {
   if (!asset) return res.status(404).json({ error: 'Asset not found' });
 
   try {
+    const uploadedFile = store.getUploadedFile(req.params.id);
+    const proxy = getProxyFile(asset, 'Preview');
+    if (uploadedFile) {
+      return await sendUploadedImageVariant(res, uploadedFile, proxy?.width || 500, proxy?.height || 500);
+    }
+
     const buffer = await imageGenerator.getImageForProxy(
       parseInt(req.params.id),
       'Preview',
@@ -84,6 +117,12 @@ router.get('/asset/:id/zoom', async (req, res) => {
   if (!asset) return res.status(404).json({ error: 'Asset not found' });
 
   try {
+    const uploadedFile = store.getUploadedFile(req.params.id);
+    const proxy = getProxyFile(asset, 'Zoom');
+    if (uploadedFile) {
+      return await sendUploadedImageVariant(res, uploadedFile, proxy?.width || 1200, proxy?.height || 900);
+    }
+
     const buffer = await imageGenerator.getImageForProxy(
       parseInt(req.params.id),
       'Zoom',
