@@ -390,6 +390,56 @@
       word-break: break-word;
     }
 
+.delivery-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(7, 12, 24, 0.55);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .delivery-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      background: var(--warn);
+    }
+
+    .delivery-dot.ok { background: var(--accent); }
+    .delivery-dot.err { background: var(--error); }
+
+    .delivery-name { font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .delivery-status { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+    .sub-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(7, 12, 24, 0.55);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .sub-enabled {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .sub-enabled.off { background: var(--muted); }
+    .sub-name { font-weight: 700; flex: 1; }
+    .sub-events { color: var(--muted); font-size: 11px; }
+
     @media (max-width: 1080px) {
       .hero, .grid, .output-grid { grid-template-columns: 1fr; }
       h1 { max-width: none; }
@@ -492,6 +542,52 @@
         <div class="tiny" id="galleryHint">Run a folder or search request to populate the gallery.</div>
       </div>
     </section>
+
+    <!-- Webhook Sender -->
+    <section class="grid" style="margin-top:18px;">
+      <div class="panel section">
+        <h2>Webhook Sender</h2>
+        <p class="subtle">Manually fire a webhook event to any registered subscriber. NetX emits these automatically on asset/folder changes; here you control the trigger.</p>
+
+        <div class="control-grid">
+          <div class="field">
+            <label for="whEvent">Event type</label>
+            <select id="whEvent"></select>
+          </div>
+          <div class="field">
+            <label for="whAssetId">Asset ID <span style="font-weight:400;text-transform:none;letter-spacing:0;">(for asset events)</span></label>
+            <input id="whAssetId" value="101" type="number" min="1">
+          </div>
+          <div class="field">
+            <label for="whFolderId">Folder ID <span style="font-weight:400;text-transform:none;letter-spacing:0;">(for folder events)</span></label>
+            <input id="whFolderId" value="6" type="number" min="1">
+          </div>
+          <div class="hero-actions">
+            <button class="button" id="whFireBtn">Fire webhook</button>
+          </div>
+        </div>
+
+        <p class="subtle" style="margin-top:18px;margin-bottom:8px;">Registered subscribers</p>
+        <div id="whSubscribers"><span style="color:var(--muted);font-size:13px;">Loading…</span></div>
+        <div class="footer-note">Edit <code>.data/webhooks.json</code> and restart to change subscribers.</div>
+      </div>
+
+      <div class="panel section">
+        <div class="status-row">
+          <div>
+            <h2 style="margin-bottom:6px;">Delivery results</h2>
+            <p class="subtle" style="margin:0;">Per-subscriber HTTP status for the last fired event.</p>
+          </div>
+          <div class="status-pill"><span class="status-dot" id="whStatusDot"></span><span id="whStatusText">Idle</span></div>
+        </div>
+        <div id="whDeliveryList"><span style="color:var(--muted);font-size:13px;">Fire an event to see results.</span></div>
+
+        <h2 style="margin-top:18px;">Last payload sent</h2>
+        <p class="subtle">Exact JSON body POSTed to each subscriber.</p>
+        <div class="response-box" style="min-height:200px;" id="whPayloadBox">Waiting.</div>
+      </div>
+    </section>
+
   </div>
 
   <script>
@@ -721,6 +817,141 @@
     }).catch(() => {});
 
     runRequest();
+
+    // ── Webhook panel ─────────────────────────────────────────────────────────
+
+    const whEvent = document.getElementById('whEvent');
+    const whAssetId = document.getElementById('whAssetId');
+    const whFolderId = document.getElementById('whFolderId');
+    const whFireBtn = document.getElementById('whFireBtn');
+    const whSubscribers = document.getElementById('whSubscribers');
+    const whDeliveryList = document.getElementById('whDeliveryList');
+    const whPayloadBox = document.getElementById('whPayloadBox');
+    const whStatusDot = document.getElementById('whStatusDot');
+    const whStatusText = document.getElementById('whStatusText');
+
+    function setWhStatus(kind, message) {
+      whStatusDot.classList.toggle('ok', kind === 'ok');
+      whStatusText.textContent = message;
+    }
+
+    function renderSubscribers(subs) {
+      whSubscribers.innerHTML = '';
+      if (!subs.length) {
+        whSubscribers.innerHTML = '<span style="color:var(--muted);font-size:13px;">No subscribers configured.</span>';
+        return;
+      }
+      for (const sub of subs) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(7,12,24,0.55);font-size:13px;margin-bottom:8px;';
+        const dot = document.createElement('span');
+        dot.style.cssText = `width:8px;height:8px;border-radius:999px;flex-shrink:0;background:${sub.enabled ? 'var(--accent)' : 'var(--muted)'};`;
+        const name = document.createElement('strong');
+        name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        name.textContent = sub.name;
+        const events = document.createElement('span');
+        events.style.cssText = 'color:var(--muted);font-size:11px;white-space:nowrap;';
+        events.textContent = sub.events.join(', ');
+        row.append(dot, name, events);
+        whSubscribers.appendChild(row);
+      }
+    }
+
+    function renderDelivery(results) {
+      whDeliveryList.innerHTML = '';
+      if (!results.length) {
+        whDeliveryList.innerHTML = '<span style="color:var(--muted);font-size:13px;">No matching subscribers for this event.</span>';
+        return;
+      }
+      for (const r of results) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(7,12,24,0.55);font-size:13px;margin-bottom:8px;';
+        const color = r.ok ? 'var(--accent)' : (r.error ? 'var(--error)' : 'var(--warn)');
+        const dot = document.createElement('span');
+        dot.style.cssText = `width:8px;height:8px;border-radius:999px;flex-shrink:0;background:${color};`;
+        const name = document.createElement('strong');
+        name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        name.textContent = r.name;
+        const statusEl = document.createElement('span');
+        statusEl.style.cssText = 'color:var(--muted);font-size:12px;white-space:nowrap;';
+        statusEl.textContent = r.error || `HTTP ${r.status} · ${r.durationMs}ms`;
+        row.append(dot, name, statusEl);
+        whDeliveryList.appendChild(row);
+      }
+    }
+
+    // Populate event type dropdown from the server
+    async function loadWebhookMeta() {
+      try {
+        const response = await fetch('/api/webhooks');
+        const data = await response.json();
+        whEvent.innerHTML = '';
+        for (const type of (data.eventTypes || [])) {
+          const opt = document.createElement('option');
+          opt.value = type;
+          opt.textContent = type;
+          whEvent.appendChild(opt);
+        }
+        renderSubscribers(data.subscriptions || []);
+        setWhStatus('ok', 'Ready');
+      } catch (err) {
+        setWhStatus('error', 'Failed to load');
+      }
+    }
+
+    whFireBtn.addEventListener('click', async () => {
+      const eventType = whEvent.value;
+      const context = {};
+      const assetId = Number(whAssetId.value);
+      const folderId = Number(whFolderId.value);
+      if (assetId > 0) context.assetId = assetId;
+      if (folderId > 0 && eventType.startsWith('folder')) context.folderId = folderId;
+
+      setWhStatus('busy', 'Firing…');
+      whPayloadBox.textContent = 'Sending…';
+      whDeliveryList.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/webhooks/trigger', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `apiToken ${tokenInput.value}`,
+          },
+          body: JSON.stringify({ event: eventType, context }),
+        });
+        const data = await response.json();
+
+        if (data.error) {
+          setWhStatus('error', data.error);
+          whPayloadBox.textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+
+        const allOk = data.results.every(r => r.ok);
+        setWhStatus(allOk ? 'ok' : 'warn', allOk ? 'Delivered' : 'Partial failure');
+        renderDelivery(data.results);
+        // Show the envelope that was built — approximate from the response context
+        whPayloadBox.textContent = JSON.stringify({
+          event: {
+            ...context,
+            systemEventType: data.event,
+            eventId: '(generated server-side)',
+            eventTime: Math.floor(Date.now() / 1000),
+            userId: 1,
+          },
+          token: tokenInput.value,
+          messageTime: Math.floor(Date.now() / 1000),
+          messageId: '(generated server-side)',
+          subscriptionId: data.results[0]?.subscriptionId,
+        }, null, 2);
+      } catch (err) {
+        setWhStatus('error', 'Request failed');
+        whPayloadBox.textContent = err.message;
+      }
+    });
+
+    loadWebhookMeta();
   </script>
 </body>
 </html>

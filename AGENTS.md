@@ -14,9 +14,11 @@ A Node.js/Express mock server that mimics the [NetX DAM JSON-RPC 2.0 API](https:
 | `handlers/methods.js` | RPC method implementations (getAssets, getFoldersByParent, etc.) |
 | `handlers/files.js` | File/thumbnail routes — unauthenticated, proxies placehold.co |
 | `handlers/import.js` | Asset import routes (multipart) |
+| `handlers/webhook.js` | Webhook subscriptions and outbound delivery (`GET /api/webhooks`, `POST /api/webhooks/trigger`) |
 | `data/assets.js` | 17 seed assets across 5 content types |
 | `data/folders.js` | 8 seed folders in a hierarchy rooted at ID 1 |
 | `data/attributes.js` | Attribute definitions and collections |
+| `data/webhooks.js` | Default webhook subscription seed (one Drupal DDEV subscriber) |
 
 ## Key Conventions
 

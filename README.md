@@ -148,7 +148,47 @@ POST /api/import/asset/:id/view         → Import a view
 GET /health
 ```
 
-## Seed Data
+### Webhooks
+
+Webhooks are triggered manually via the dashboard or directly via the API.
+
+```
+GET  /api/webhooks               → list subscriptions and supported event types (no auth)
+POST /api/webhooks/trigger       → fire an event to all matching subscribers
+  Authorization: apiToken dev-token-1234
+  Content-Type: application/json
+```
+
+Trigger body:
+```json
+{
+  "event": "asset_create",
+  "context": { "assetId": 101 }
+}
+```
+
+Each matching subscriber receives the standard NetX webhook envelope:
+```json
+{
+  "event": {
+    "assetId": 101,
+    "systemEventType": "asset_create",
+    "eventId": "<uuid>",
+    "eventTime": 1674076946,
+    "userId": 1
+  },
+  "token": "dev-token-1234",
+  "messageTime": 1674076946,
+  "messageId": "<uuid>",
+  "subscriptionId": 1
+}
+```
+
+Subscriptions are stored in `.data/webhooks.json` (created from `data/webhooks.js` seed on first run). Edit the file and restart to change subscribers.
+
+Supported event types: `asset_create`, `asset_delete`, `asset_addtofolder`, `asset_checkin`, `asset_checkout`, `asset_expire`, `asset_updateattributes`, `folder_create`, `folder_update`, `user_create`, `user_expire`, `user_update`
+
+> Note: event type values are lowercase to match the Drupal module's `NetxWebhookEventType` enum. The real NetX server uses `UPPER_SNAKE_CASE`.
 
 The mock ships with realistic seed data:
 

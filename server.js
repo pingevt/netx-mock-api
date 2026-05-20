@@ -26,6 +26,7 @@ const path = require('path');
 const { handleRpc } = require('./handlers/rpc');
 const fileRoutes = require('./handlers/files');
 const importRoutes = require('./handlers/import');
+const { router: webhookRoutes } = require('./handlers/webhook');
 
 
 const app = express();
@@ -82,6 +83,9 @@ app.use('/api/file', fileRoutes);
 
 // Import endpoints
 app.use('/api/import', requireAuth, importRoutes);
+
+// Webhook subscriptions (GET /api/webhooks open; POST /api/webhooks/trigger auth-checked in router)
+app.use('/api/webhooks', webhookRoutes);
 
 // Health check (no auth required)
 app.get('/health', (req, res) => {
