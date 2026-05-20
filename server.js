@@ -65,6 +65,15 @@ function requireAuth(req, res, next) {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
+// Demo dashboard
+app.get('/', (req, res) => {
+  res.redirect('/dashboard');
+});
+
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
 // JSON-RPC endpoint
 app.post('/api/rpc', requireAuth, handleRpc);
 
@@ -94,6 +103,7 @@ app.listen(PORT, () => {
   console.log('  ├─────────────────────────────────────────────┤');
   console.log(`  │  URL:   http://localhost:${PORT}               │`);
   console.log(`  │  RPC:   http://localhost:${PORT}/api/rpc        │`);
+  console.log(`  │  Demo:  http://localhost:${PORT}/dashboard      │`);
   console.log(`  │  Token: ${EXPECTED_TOKEN}                 │`);
   console.log('  │                                             │');
   console.log('  │  Health: GET /health                        │');

@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetX Mock API Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --bg2: #11192f;
+      --panel: rgba(13, 19, 38, 0.82);
+      --panel-strong: rgba(18, 27, 53, 0.96);
+      --text: #eef3ff;
+      --muted: #a3b2d4;
+      --line: rgba(152, 176, 255, 0.18);
+      --accent: #7cf0c6;
+      --accent2: #76a8ff;
+      --warn: #ffbd66;
+      --error: #ff7b8f;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+      --radius: 22px;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      --display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: var(--body);
+      background:
+        radial-gradient(circle at top left, rgba(124, 240, 198, 0.16), transparent 30%),
+        radial-gradient(circle at 80% 10%, rgba(118, 168, 255, 0.18), transparent 24%),
+        linear-gradient(140deg, #060913 0%, #0b1020 46%, #11192f 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 88%);
+      opacity: 0.6;
+    }
+
+    .shell {
+      position: relative;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 22px 44px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero-main {
+      padding: 28px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero-main::after {
+      content: "";
+      position: absolute;
+      right: -60px;
+      top: -60px;
+      width: 240px;
+      height: 240px;
+      background: radial-gradient(circle, rgba(124, 240, 198, 0.22), transparent 68%);
+      filter: blur(10px);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(124, 240, 198, 0.1);
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 18px 0 12px;
+      font-family: var(--display);
+      font-size: clamp(36px, 4.8vw, 68px);
+      line-height: 0.94;
+      letter-spacing: -0.03em;
+      max-width: 10ch;
+    }
+
+    .lede {
+      max-width: 68ch;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+      margin: 0 0 22px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .button {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      padding: 12px 16px;
+      color: #07101a;
+      background: linear-gradient(135deg, var(--accent), #d6ff7d);
+      font: 700 14px/1 var(--body);
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+      box-shadow: 0 10px 30px rgba(124, 240, 198, 0.22);
+    }
+
+    .button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--line);
+      box-shadow: none;
+    }
+
+    .button:hover { transform: translateY(-1px); }
+    .button:active { transform: translateY(0); }
+
+    .hero-side {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .stat {
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .stat-copy {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .section {
+      padding: 18px;
+    }
+
+    .section h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 16px;
+    }
+
+    .control-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(152, 176, 255, 0.22);
+      background: rgba(7, 12, 24, 0.7);
+      color: var(--text);
+      padding: 12px 13px;
+      font: 500 14px/1.5 var(--body);
+      outline: none;
+    }
+
+    textarea {
+      min-height: 235px;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(124, 240, 198, 0.7);
+      box-shadow: 0 0 0 3px rgba(124, 240, 198, 0.12);
+    }
+
+    .preset-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .preset-chip {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: transform 140ms ease, background 140ms ease;
+      font-size: 13px;
+    }
+
+    .preset-chip:hover {
+      transform: translateY(-1px);
+      background: rgba(118, 168, 255, 0.12);
+    }
+
+    .output-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .response-box {
+      min-height: 360px;
+      border-radius: 18px;
+      border: 1px solid rgba(152, 176, 255, 0.18);
+      background: rgba(7, 12, 24, 0.7);
+      padding: 16px;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--warn);
+      box-shadow: 0 0 0 4px rgba(255, 189, 102, 0.15);
+    }
+
+    .status-dot.ok {
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(124, 240, 198, 0.12);
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .card {
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(152, 176, 255, 0.18);
+      background: rgba(11, 16, 32, 0.72);
+    }
+
+    .thumb {
+      aspect-ratio: 4 / 3;
+      width: 100%;
+      object-fit: cover;
+      display: block;
+      background: linear-gradient(135deg, rgba(124, 240, 198, 0.18), rgba(118, 168, 255, 0.16));
+    }
+
+    .card-body {
+      padding: 12px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .card-title {
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .card-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .tiny {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 8px 0 0;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .request-preview {
+      margin-top: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(152, 176, 255, 0.18);
+      background: rgba(7, 12, 24, 0.7);
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    @media (max-width: 1080px) {
+      .hero, .grid, .output-grid { grid-template-columns: 1fr; }
+      h1 { max-width: none; }
+    }
+
+    @media (max-width: 680px) {
+      .shell { padding: 16px 12px 28px; }
+      .hero-main, .section, .hero-side { padding: 16px; }
+      .hero-actions, .preset-list { gap: 8px; }
+      .button, .preset-chip { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="panel hero-main">
+        <span class="eyebrow">POST-only demo surface</span>
+        <h1>NetX Mock API, but showable in a browser.</h1>
+        <p class="lede">
+          This dashboard wraps the JSON-RPC endpoint in a simple workflow: pick a method, send a POST request,
+          inspect the response, and browse live thumbnails from the same mock data the Drupal module uses.
+        </p>
+        <div class="hero-actions">
+          <button class="button" id="runBtn">Run request</button>
+          <button class="button secondary" id="loadFoldersBtn">Load folders</button>
+          <button class="button secondary" id="loadAssetsBtn">Load landscape assets</button>
+        </div>
+        <div class="preset-list">
+          <button class="preset-chip" data-preset="folders">Folders</button>
+          <button class="preset-chip" data-preset="landscapes">Landscapes</button>
+          <button class="preset-chip" data-preset="logos">Logo search</button>
+          <button class="preset-chip" data-preset="attributes">Asset attributes</button>
+        </div>
+      </div>
+      <aside class="panel hero-side">
+        <div class="stat">
+          <div class="stat-label">What it proves</div>
+          <div class="stat-value">Real POST calls</div>
+          <div class="stat-copy">Every action on this page goes through the JSON-RPC endpoint with the same request shape the Drupal module uses.</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Media output</div>
+          <div class="stat-value">Thumbnails</div>
+          <div class="stat-copy">Results can render live images from the unauthenticated file routes, so the demo feels visual instead of abstract.</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Best for</div>
+          <div class="stat-value">Coworker walkthroughs</div>
+          <div class="stat-copy">Open one URL, click one button, and show the full flow from folder browsing to asset preview.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid">
+      <div class="panel section">
+        <h2>Request Builder</h2>
+        <p class="subtle">Change the method or params, then send a POST to <strong>/api/rpc</strong>.</p>
+
+        <div class="control-grid">
+          <div class="field">
+            <label for="endpointInput">Endpoint</label>
+            <input id="endpointInput" value="/api/rpc" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="tokenInput">Token</label>
+            <input id="tokenInput" value="dev-token-1234" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="methodSelect">Method</label>
+            <select id="methodSelect"></select>
+          </div>
+          <div class="field">
+            <label for="paramsInput">Params JSON</label>
+            <textarea id="paramsInput" spellcheck="false"></textarea>
+          </div>
+          <div class="hero-actions">
+            <button class="button" id="sendBtn">Send POST</button>
+            <button class="button secondary" id="copyBtn">Copy request</button>
+          </div>
+        </div>
+
+        <div class="request-preview" id="requestPreview"></div>
+        <div class="footer-note">Tip: this is intentionally tiny and direct. It is enough to narrate the API without getting lost in tooling.</div>
+      </div>
+
+      <div class="panel section">
+        <div class="status-row">
+          <div>
+            <h2 style="margin-bottom:6px;">Response</h2>
+            <p class="subtle" style="margin:0;">The raw JSON comes back here, and matching results can populate the asset gallery below.</p>
+          </div>
+          <div class="status-pill"><span class="status-dot" id="statusDot"></span><span id="statusText">Idle</span></div>
+        </div>
+        <div class="response-box" id="responseBox">Waiting for a request.</div>
+
+        <h2 style="margin-top:18px;">Live Gallery</h2>
+        <p class="subtle">When the response includes assets, the gallery shows thumbnails straight from the file endpoints.</p>
+        <div class="gallery" id="gallery"></div>
+        <div class="tiny" id="galleryHint">Run a folder or search request to populate the gallery.</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const methods = [
+      { value: 'getFoldersByParent', label: 'getFoldersByParent' },
+      { value: 'getAssetsByFolder', label: 'getAssetsByFolder' },
+      { value: 'getAssetsByQuery', label: 'getAssetsByQuery' },
+      { value: 'getAssetAttributes', label: 'getAssetAttributes' },
+      { value: 'getAssets', label: 'getAssets' },
+      { value: 'getAttributes', label: 'getAttributes' },
+    ];
+
+    const presets = {
+      folders: {
+        method: 'getFoldersByParent',
+        params: [1, { page: { startIndex: 0, size: 12 }, data: ['folder.id', 'folder.name'] }],
+      },
+      landscapes: {
+        method: 'getAssetsByFolder',
+        params: [6, false, { page: { startIndex: 0, size: 12 } }],
+      },
+      logos: {
+        method: 'getAssetsByQuery',
+        params: [
+          {
+            query: [
+              { operator: 'and', contains: { field: 'asset.name', value: 'logo' } },
+            ],
+          },
+          { page: { startIndex: 0, size: 12 } },
+        ],
+      },
+      attributes: {
+        method: 'getAssetAttributes',
+        params: [101],
+      },
+    };
+
+    const endpointInput = document.getElementById('endpointInput');
+    const tokenInput = document.getElementById('tokenInput');
+    const methodSelect = document.getElementById('methodSelect');
+    const paramsInput = document.getElementById('paramsInput');
+    const requestPreview = document.getElementById('requestPreview');
+    const responseBox = document.getElementById('responseBox');
+    const gallery = document.getElementById('gallery');
+    const galleryHint = document.getElementById('galleryHint');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+
+    let requestId = 1;
+
+    for (const method of methods) {
+      const option = document.createElement('option');
+      option.value = method.value;
+      option.textContent = method.label;
+      methodSelect.appendChild(option);
+    }
+
+    function pretty(value) {
+      return JSON.stringify(value, null, 2);
+    }
+
+    function currentRequest() {
+      let params;
+      try {
+        params = JSON.parse(paramsInput.value || '[]');
+      } catch (error) {
+        params = [];
+      }
+
+      return {
+        jsonrpc: '2.0',
+        id: `demo-${requestId}`,
+        method: methodSelect.value,
+        params,
+      };
+    }
+
+    function syncPreview() {
+      requestPreview.textContent = pretty({
+        url: endpointInput.value,
+        headers: {
+          Authorization: `apiToken ${tokenInput.value || ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: currentRequest(),
+      });
+    }
+
+    function setStatus(kind, message) {
+      statusDot.classList.toggle('ok', kind === 'ok');
+      statusText.textContent = message;
+    }
+
+    function loadPreset(name) {
+      const preset = presets[name];
+      if (!preset) return;
+      methodSelect.value = preset.method;
+      paramsInput.value = pretty(preset.params);
+      syncPreview();
+    }
+
+    function extractAssets(payload) {
+      if (!payload) return [];
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload.results)) return payload.results;
+      if (Array.isArray(payload.assets)) return payload.assets;
+      return [];
+    }
+
+    function renderGallery(items) {
+      gallery.innerHTML = '';
+      const assets = extractAssets(items);
+
+      if (!assets.length) {
+        galleryHint.textContent = 'No asset list returned yet. Try the landscape or logo presets.';
+        return;
+      }
+
+      galleryHint.textContent = `${assets.length} asset${assets.length === 1 ? '' : 's'} shown here.`;
+
+      for (const asset of assets) {
+        const card = document.createElement('article');
+        card.className = 'card';
+
+        const thumb = document.createElement('img');
+        thumb.className = 'thumb';
+        thumb.alt = asset.name || asset.fileName || `Asset ${asset.id}`;
+        thumb.loading = 'lazy';
+        thumb.src = asset?.proxies?.find((proxy) => proxy.name === 'Thumbnail')?.file?.url || asset?.file?.url || '';
+
+        const body = document.createElement('div');
+        body.className = 'card-body';
+
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = asset.name || asset.fileName || `Asset ${asset.id}`;
+
+        const meta = document.createElement('div');
+        meta.className = 'card-meta';
+        const folderNames = (asset.folders || []).map((folder) => folder.name).join(', ');
+        meta.textContent = `ID ${asset.id}${folderNames ? ` · ${folderNames}` : ''}`;
+
+        body.append(title, meta);
+        card.append(thumb, body);
+        gallery.appendChild(card);
+      }
+    }
+
+    async function runRequest() {
+      setStatus('busy', 'Sending');
+      responseBox.textContent = 'Working...';
+
+      let params;
+      try {
+        params = JSON.parse(paramsInput.value || '[]');
+      } catch (error) {
+        setStatus('error', 'Invalid JSON');
+        responseBox.textContent = `Params JSON is invalid: ${error.message}`;
+        return;
+      }
+
+      const body = {
+        jsonrpc: '2.0',
+        id: `demo-${requestId++}`,
+        method: methodSelect.value,
+        params,
+      };
+
+      syncPreview();
+
+      try {
+        const response = await fetch(endpointInput.value, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `apiToken ${tokenInput.value}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        const data = await response.json();
+        responseBox.textContent = pretty(data);
+
+        if (data.error) {
+          setStatus('error', `RPC error ${data.error.code}`);
+          gallery.innerHTML = '';
+          galleryHint.textContent = 'Errors do not populate the gallery.';
+          return;
+        }
+
+        setStatus('ok', 'Success');
+        renderGallery(data.result);
+      } catch (error) {
+        setStatus('error', 'Request failed');
+        responseBox.textContent = error.stack || error.message;
+      }
+    }
+
+    async function copyRequest() {
+      syncPreview();
+      await navigator.clipboard.writeText(requestPreview.textContent);
+      setStatus('ok', 'Request copied');
+    }
+
+    document.getElementById('runBtn').addEventListener('click', runRequest);
+    document.getElementById('sendBtn').addEventListener('click', runRequest);
+    document.getElementById('copyBtn').addEventListener('click', copyRequest);
+    document.getElementById('loadFoldersBtn').addEventListener('click', () => loadPreset('folders'));
+    document.getElementById('loadAssetsBtn').addEventListener('click', () => loadPreset('landscapes'));
+
+    document.querySelectorAll('[data-preset]').forEach((button) => {
+      button.addEventListener('click', () => loadPreset(button.dataset.preset));
+    });
+
+    methodSelect.addEventListener('change', syncPreview);
+    endpointInput.addEventListener('input', syncPreview);
+    tokenInput.addEventListener('input', syncPreview);
+    paramsInput.addEventListener('input', syncPreview);
+
+    loadPreset('folders');
+    syncPreview();
+    fetch('/health').then((response) => response.json()).then((data) => {
+      if (data?.status === 'ok') {
+        setStatus('ok', 'Server healthy');
+      }
+    }).catch(() => {});
+
+    runRequest();
+  </script>
+</body>
+</html>

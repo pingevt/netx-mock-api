@@ -26,6 +26,8 @@ npm run dev
 
 The server starts at **http://localhost:3000**.
 
+For a quick demo UI, open **http://localhost:3000/dashboard**. It wraps the JSON-RPC endpoint in a browser page with preset requests, raw responses, and a live asset gallery.
+
 ## Drupal Module Configuration
 
 Once running, configure your NetX Source entity in Drupal:
