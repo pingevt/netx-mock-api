@@ -1,7 +1,7 @@
 {
   "name": "netx-mock-api",
   "version": "1.0.0",
-  "description": "Mock NetX DAM API server for local development of the netx_media_source Drupal module",
+  "description": "Mock NetX DAM API server for local development against NetX without a NetX instance",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

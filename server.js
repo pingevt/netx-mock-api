@@ -2,7 +2,7 @@
  * NetX Mock API Server
  *
  * Mimics the NetX DAM JSON-RPC API (https://developer.netx.net/)
- * for local development of the netx_media_source Drupal module.
+ * for local development against NetX without a NetX instance.
  *
  * Endpoints:
  *   POST /api/rpc            - JSON-RPC 2.0 API
