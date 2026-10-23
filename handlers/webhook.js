@@ -7,27 +7,30 @@
  *   GET  /api/webhooks               → list all subscriptions
  *   POST /api/webhooks/trigger       → manually fire an event (auth required)
  *
- * Payload shape (matches NetX webhook delivery format, with lowercase event
- * types for compatibility with Drupal's NetxWebhookEventType enum):
+ * Payload shape, modeled on NetX's documented webhook delivery
+ * (https://support.netx.net/hc/en-us/articles/11766295044119-Webhooks):
  *
  *   {
  *     "event": {
- *       "assetId": 101,              // present for asset events
- *       "folderId": 6,               // present for folder events
- *       "systemEventType": "asset_create",
+ *       "assetId": 101,              // asset events only
+ *       "folderId": 6,               // folder events only
+ *       "systemEventType": "ASSET_CREATE",
  *       "eventId": "<uuid>",
- *       "eventTime": 1674076946,
+ *       "eventTime": 1674076946,     // epoch seconds
  *       "userId": 1
  *     },
- *     "token": "dev-token-1234",
+ *     "token": "<subscription secret>",   // only when the subscription has one
  *     "messageTime": 1674076946,
  *     "messageId": "<uuid>",
  *     "subscriptionId": 1
  *   }
  *
- * TODO: Add HMAC-SHA256 signature header (X-NetX-Signature) using a per-
- *       subscription secret so Drupal can verify the sender.
- * TODO: Add retry schedule (5m, 30m, 30m, 12h, 24h) matching NetX behavior.
+ * NetX has no signature header. The optional shared secret travels in the
+ * body as "token", so a receiver authenticates by comparing that value.
+ *
+ * Not implemented: NetX's retry schedule (immediately, 5m, 30m, 30m, 12h,
+ * 24h) and its habit of disabling a webhook after the last failed retry.
+ * This mock delivers once.
  */
 
 const express = require('express');
@@ -42,23 +45,26 @@ const CONFIG_FILE = path.join(PERSIST_DIR, 'webhooks.json');
 const { webhooks: SEED_WEBHOOKS } = require('../data/webhooks');
 
 // ─── All supported event types ─────────────────────────────────────────────
-// Values are lowercase to match Drupal's NetxWebhookEventType enum.
-// NetX production docs use UPPER_SNAKE_CASE — keep that in mind if integrating
-// with a real NetX server.
+// NetX sends systemEventType in UPPER_SNAKE_CASE (e.g. ASSET_CREATE). Input to
+// this mock is matched case-insensitively, but deliveries always use these.
 const EVENT_TYPES = [
-  'asset_create',
-  'asset_delete',
-  'asset_addtofolder',
-  'asset_checkin',
-  'asset_checkout',
-  'asset_expire',
-  'asset_updateattributes',
-  'folder_create',
-  'folder_update',
-  'user_create',
-  'user_expire',
-  'user_update',
+  'ASSET_CREATE',
+  'ASSET_DELETE',
+  'ASSET_ADDTOFOLDER',
+  'ASSET_CHECKIN',
+  'ASSET_CHECKOUT',
+  'ASSET_EXPIRE',
+  'ASSET_UPDATEATTRIBUTES',
+  'FOLDER_CREATE',
+  'FOLDER_UPDATE',
+  'USER_CREATE',
+  'USER_EXPIRE',
+  'USER_UPDATE',
 ];
+
+function normalizeEventType(value) {
+  return String(value || '').trim().toUpperCase();
+}
 
 // ─── Config persistence ────────────────────────────────────────────────────
 
@@ -86,7 +92,7 @@ function saveConfig(subscriptions) {
 
 // ─── Envelope builder ──────────────────────────────────────────────────────
 
-function buildEnvelope(eventType, context, subscriptionId, token) {
+function buildEnvelope(eventType, context, subscriptionId, secret) {
   const now = Math.floor(Date.now() / 1000);
   const event = {
     systemEventType: eventType,
@@ -98,13 +104,16 @@ function buildEnvelope(eventType, context, subscriptionId, token) {
   if (context.assetId !== undefined) event.assetId = Number(context.assetId);
   if (context.folderId !== undefined) event.folderId = Number(context.folderId);
 
-  return {
+  const envelope = {
     event,
-    token: token || (process.env.NETX_API_TOKEN || 'dev-token-1234'),
     messageTime: now,
     messageId: uuidv4(),
     subscriptionId,
   };
+  // The secret is optional on the NetX side, so the token is only sent when
+  // the subscription has one.
+  if (secret) envelope.token = secret;
+  return envelope;
 }
 
 // ─── HTTP delivery ─────────────────────────────────────────────────────────
@@ -127,7 +136,6 @@ async function deliver(subscription, envelope) {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
         'User-Agent': 'NetX-Mock-Webhook/1.0',
-        // TODO: add X-NetX-Signature header with HMAC-SHA256 of body
       },
       body: JSON.stringify(envelope),
       signal: AbortSignal.timeout(10000),
@@ -147,14 +155,15 @@ async function deliver(subscription, envelope) {
 
 async function sendWebhook(eventType, context = {}) {
   const subscriptions = loadConfig();
+  const type = normalizeEventType(eventType);
   const active = subscriptions.filter(
-    s => s.enabled && (s.events.includes(eventType) || s.events.includes('*'))
+    s => s.enabled && (s.events.includes('*') || s.events.map(normalizeEventType).includes(type))
   );
 
   const results = await Promise.all(
     active.map(sub => {
-      const envelope = buildEnvelope(eventType, context, sub.id);
-      console.log(`[Webhook] Firing ${eventType} → ${sub.url}`);
+      const envelope = buildEnvelope(type, context, sub.id, sub.secret);
+      console.log(`[Webhook] Firing ${type} → ${sub.url}`);
       return deliver(sub, envelope);
     })
   );
@@ -176,14 +185,15 @@ module.exports.EVENT_TYPES = EVENT_TYPES;
 // GET /api/webhooks — list subscriptions (no auth — safe for dashboard display)
 router.get('/', (req, res) => {
   res.json({
-    subscriptions: loadConfig(),
+    subscriptions: loadConfig().map(({ secret, ...rest }) => ({ ...rest, hasSecret: Boolean(secret) })),
     eventTypes: EVENT_TYPES,
   });
 });
 
 // POST /api/webhooks/trigger — manually fire an event (requires apiToken header)
 //
-// Body: { "event": "asset_create", "context": { "assetId": 101 } }
+// Body: { "event": "ASSET_CREATE", "context": { "assetId": 101 } }
+// The event name is case-insensitive.
 router.post('/trigger', (req, res, next) => {
   const authHeader = req.headers['authorization'] || '';
   const token = authHeader.replace(/^apiToken\s+/i, '').trim();
@@ -194,7 +204,8 @@ router.post('/trigger', (req, res, next) => {
   }
   next();
 }, async (req, res) => {
-  const { event: eventType, context = {} } = req.body;
+  const { event, context = {} } = req.body;
+  const eventType = normalizeEventType(event);
 
   if (!eventType) {
     return res.status(400).json({ error: 'event is required' });

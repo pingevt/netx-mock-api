@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A Node.js/Express mock server that mimics the [NetX DAM JSON-RPC 2.0 API](https://developer.netx.net/) for local development of the `netx_media_source` Drupal module. Not for production use.
+A Node.js/Express mock server that mimics the [NetX DAM JSON-RPC 2.0 API](https://developer.netx.net/) for local development of the `netx_dam` Drupal module. Not for production use.
 
 ## Architecture
 
@@ -85,7 +85,9 @@ feat(rpc): implement setAssetAttributes method
 
 ## Paired With
 
-`netx_media_source` Drupal module at `/Users/peteinge/Modules/netx_media_source`. Configure the `NetxSource` entity with:
-- **API URL Base**: `http://host.docker.internal:3000/api/rpc` (PHP/server-side)
+The `netx_dam` Drupal module (`github.com/pingevt/netx_dam`). Configure a `NetxSource` entity with:
+- **API URL Base**: `http://host.docker.internal:3000/api/rpc` (PHP/server-side, from ddev or Docker)
 - **Public Base URL**: `http://localhost:3000` (browser-side, for thumbnails)
-- **Token**: key entity containing `dev-token-1234`
+- **Token**: a Key entity containing `dev-token-1234`
+
+The mock is not a source of truth for NetX. Webhook deliveries use NetX's documented shape (UPPER_SNAKE_CASE `systemEventType`, secret as body `token`).

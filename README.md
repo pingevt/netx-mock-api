@@ -1,6 +1,8 @@
 # NetX Mock API Server
 
-A local Node.js server that mimics the [NetX DAM JSON-RPC API](https://developer.netx.net/) for development of the `netx_media_source` Drupal module — no real NetX environment required.
+A local Node.js server that mimics the [NetX DAM JSON-RPC API](https://developer.netx.net/) so you can develop against NetX without a NetX environment. Built for the [`netx_dam`](https://github.com/pingevt/netx_dam) Drupal module, but the API is plain JSON-RPC and works with any client.
+
+> **Not NetX.** This mock was written from NetX's public docs and is not a source of truth. Response shapes, limits, error cases and ordering can differ from the real service. Treat anything you build against it as unverified until you have run it against a real NetX instance.
 
 ## Requirements
 
@@ -30,15 +32,29 @@ For a quick demo UI, open **http://localhost:3000/dashboard**. It wraps the JSON
 
 ## Drupal Module Configuration
 
-Once running, configure your NetX Source entity in Drupal:
+Once running, set up the [`netx_dam`](https://github.com/pingevt/netx_dam) module:
+
+1. Create a [Key](https://www.drupal.org/project/key) whose value is the API token (`dev-token-1234` by default).
+2. Add a NetX source (`/admin/structure/netx-dam-source`):
 
 | Field | Value |
 |-------|-------|
-| API URL (RPC endpoint) | `http://localhost:3000/api/rpc` |
-| API Base URL | `http://localhost:3000` |
-| API Token | `dev-token-1234` |
+| API URL (RPC endpoint) | `http://localhost:3000/api/rpc` (or `http://host.docker.internal:3000/api/rpc` when Drupal runs in Docker/ddev) |
+| API Base URL | `http://localhost:3000` (the address your *browser* uses, for thumbnails) |
+| API Token | the Key from step 1 |
 
-> The token value is accepted as-is. Set `STRICT_AUTH=true` in your environment to enforce it.
+> The token is accepted as-is. Set `STRICT_AUTH=true` to enforce it, and `NETX_API_TOKEN` to change the expected value.
+
+## Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `3000` | Listen port |
+| `NETX_API_TOKEN` | `dev-token-1234` | Expected token when `STRICT_AUTH=true` |
+| `STRICT_AUTH` | off | Reject requests without the right token |
+| `PERSIST_DATA_DIR` | `./.data` | Where uploads and webhook subscriptions are kept |
+| `WEBHOOK_URL` | none | Enables the seed webhook subscription and sets its target (first run only) |
+| `WEBHOOK_SECRET` | `dev-webhook-secret` | Secret the seed subscription sends as `token` |
 
 ## Endpoints
 
@@ -159,36 +175,37 @@ POST /api/webhooks/trigger       → fire an event to all matching subscribers
   Content-Type: application/json
 ```
 
-Trigger body:
+Trigger body (the event name is case-insensitive):
 ```json
 {
-  "event": "asset_create",
+  "event": "ASSET_CREATE",
   "context": { "assetId": 101 }
 }
 ```
 
-Each matching subscriber receives the standard NetX webhook envelope:
+Each matching subscriber receives a delivery shaped like NetX's, per [NetX's webhook docs](https://support.netx.net/hc/en-us/articles/11766295044119-Webhooks):
 ```json
 {
   "event": {
-    "assetId": 101,
-    "systemEventType": "asset_create",
+    "systemEventType": "ASSET_CREATE",
     "eventId": "<uuid>",
     "eventTime": 1674076946,
-    "userId": 1
+    "userId": 1,
+    "assetId": 101
   },
-  "token": "dev-token-1234",
+  "token": "<subscription secret>",
   "messageTime": 1674076946,
   "messageId": "<uuid>",
   "subscriptionId": 1
 }
 ```
 
-Subscriptions are stored in `.data/webhooks.json` (created from `data/webhooks.js` seed on first run). Edit the file and restart to change subscribers.
+- `systemEventType` is UPPER_SNAKE_CASE, as NetX sends it. Times are epoch seconds. Folder events carry `folderId` instead of `assetId`.
+- The shared secret is optional on NetX's side and arrives as the body `token`. There is no signature header. The mock only sends `token` for a subscription that has a `secret`.
+- Subscriptions live in `.data/webhooks.json`, created from `data/webhooks.js` on first run. Edit the file and restart to change them. The seed subscription is **disabled** unless `WEBHOOK_URL` is set, for example `WEBHOOK_URL=https://my-site.ddev.site/netx-dam/webhook/mock npm start`.
+- Not implemented: NetX's retry schedule (immediately, 5m, 30m, 30m, 12h, 24h) and its behavior of disabling a webhook after the last failure. The mock delivers once, with a 10 second timeout.
 
-Supported event types: `asset_create`, `asset_delete`, `asset_addtofolder`, `asset_checkin`, `asset_checkout`, `asset_expire`, `asset_updateattributes`, `folder_create`, `folder_update`, `user_create`, `user_expire`, `user_update`
-
-> Note: event type values are lowercase to match the Drupal module's `NetxWebhookEventType` enum. The real NetX server uses `UPPER_SNAKE_CASE`.
+Supported event types: `ASSET_CREATE`, `ASSET_DELETE`, `ASSET_ADDTOFOLDER`, `ASSET_CHECKIN`, `ASSET_CHECKOUT`, `ASSET_EXPIRE`, `ASSET_UPDATEATTRIBUTES`, `FOLDER_CREATE`, `FOLDER_UPDATE`, `USER_CREATE`, `USER_EXPIRE`, `USER_UPDATE`
 
 The mock ships with realistic seed data:
 
