@@ -30,6 +30,19 @@ The server starts at **http://localhost:3000**.
 
 For a quick demo UI, open **http://localhost:3000/dashboard**. It wraps the JSON-RPC endpoint in a browser page with preset requests, raw responses, and a live asset gallery.
 
+## Docker
+
+A multi-arch image (amd64 and arm64) is published to GitHub's container registry from `main`:
+
+```bash
+docker run -d --name netx-mock -p 3000:3000 -v netx-mock-data:/data ghcr.io/pingevt/netx-mock-api:latest
+```
+
+- State (uploads, webhook subscriptions) lives in `/data`. Drop the `-v` to start clean each run.
+- Configure it with the environment variables below, for example `-e STRICT_AUTH=true -e WEBHOOK_URL=...`.
+- From another container (ddev, Docker Compose) reach it by service or container name instead of `host.docker.internal`.
+- To build it yourself: `docker build -t netx-mock-api .`
+
 ## Drupal Module Configuration
 
 Once running, set up the [`netx_dam`](https://github.com/pingevt/netx_dam) module:
