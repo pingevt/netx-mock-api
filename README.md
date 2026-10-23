@@ -269,3 +269,7 @@ Root (1)
 - **Data persists across restarts** — runtime state is written to `.data/store.json`, uploads to `.data/uploads/`
 - **To reset state**, stop the server and remove `.data/`
 - The `fromjs` route in the Drupal module (`/netx-media/ajax/{mediatype}/fromjs`) is a Drupal-side endpoint — it is not part of this mock server
+
+## License
+
+MIT, see [LICENSE](LICENSE).
