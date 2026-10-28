@@ -323,6 +323,14 @@
       background: linear-gradient(135deg, rgba(124, 240, 198, 0.18), rgba(118, 168, 255, 0.16));
     }
 
+    .thumb-folder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
     .card-body {
       padding: 12px;
       display: grid;
@@ -668,11 +676,22 @@
         const card = document.createElement('article');
         card.className = 'card';
 
-        const thumb = document.createElement('img');
-        thumb.className = 'thumb';
-        thumb.alt = asset.name || asset.fileName || `Asset ${asset.id}`;
-        thumb.loading = 'lazy';
-        thumb.src = asset?.proxies?.find((proxy) => proxy.name === 'Thumbnail')?.file?.url || asset?.file?.url || '';
+        // Folders (for example from the Folders preset) have no file or
+        // thumbnail, so they get a plain label instead of a broken image.
+        const thumbUrl = asset?.proxies?.find((proxy) => proxy.name === 'Thumbnail')?.file?.url || asset?.file?.url || '';
+        let thumb;
+        if (thumbUrl) {
+          thumb = document.createElement('img');
+          thumb.className = 'thumb';
+          thumb.alt = asset.name || asset.fileName || `Asset ${asset.id}`;
+          thumb.loading = 'lazy';
+          thumb.src = thumbUrl;
+        }
+        else {
+          thumb = document.createElement('div');
+          thumb.className = 'thumb thumb-folder';
+          thumb.textContent = 'Folder';
+        }
 
         const body = document.createElement('div');
         body.className = 'card-body';
