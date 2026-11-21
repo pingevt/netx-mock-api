@@ -7,6 +7,8 @@
  *   GET /api/file/asset/:id/preview      - Preview proxy
  *   GET /api/file/asset/:id/zoom         - Zoom proxy
  *
+ * Like NetX, these need the Authorization header (requireAuth, applied in server.js).
+ *
  * In this mock, all file endpoints return a generated image via sharp.
  * Images are unique per asset ID and cached for performance.
  */

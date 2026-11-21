@@ -12,7 +12,7 @@ A Node.js/Express mock server that mimics the [NetX DAM JSON-RPC 2.0 API](https:
 | `store.js` | In-memory data store with CRUD — resets on restart |
 | `handlers/rpc.js` | JSON-RPC 2.0 dispatcher |
 | `handlers/methods.js` | RPC method implementations (getAssets, getFoldersByParent, etc.) |
-| `handlers/files.js` | File/thumbnail routes — unauthenticated, proxies placehold.co |
+| `handlers/files.js` | File/thumbnail routes — require the API token (like NetX), proxies placehold.co |
 | `handlers/import.js` | Asset import routes (multipart) |
 | `handlers/webhook.js` | Webhook subscriptions and outbound delivery (`GET /api/webhooks`, `POST /api/webhooks/trigger`) |
 | `data/assets.js` | 17 seed assets across 5 content types |
@@ -22,7 +22,7 @@ A Node.js/Express mock server that mimics the [NetX DAM JSON-RPC 2.0 API](https:
 
 ## Key Conventions
 
-- **Auth**: `Authorization: apiToken <token>` header required on `/api/rpc` and `/api/import`. File routes (`/api/file/`) are **unauthenticated** — browser `<img>` tags need direct access
+- **Auth**: `Authorization: apiToken <token>` header required on `/api/rpc`, `/api/import` and the file routes (`/api/file/`), as in NetX. A browser `<img>` tag cannot send it, so the dashboard loads images with `fetch()` and shows them from a blob URL
 - **Default token**: `dev-token-1234` (set `NETX_API_TOKEN` env var to override)
 - **RPC envelope**: Always `{ jsonrpc: "2.0", id, method, params }` in, `{ jsonrpc: "2.0", id, result }` or `{ ..., error }` out
 - **Proxy URLs**: Asset proxy URLs use `/api/file/asset/:id/thumbnail` etc. — not `/view/...` paths

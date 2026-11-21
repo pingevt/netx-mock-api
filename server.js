@@ -15,6 +15,7 @@
  *   GET  /view/...                        - Proxy file URLs (used by module)
  *
  * Auth: Send any non-empty value as: Authorization: apiToken <token>
+ *       Required on /api/rpc, /api/import and /api/file (file retrieval included, as in NetX).
  *       Use NETX_API_TOKEN env var to set expected token (default: dev-token-1234)
  */
 
@@ -78,8 +79,8 @@ app.get('/dashboard', (req, res) => {
 // JSON-RPC endpoint
 app.post('/api/rpc', requireAuth, handleRpc);
 
-// File retrieval — no auth required (browser img tags need to load these)
-app.use('/api/file', fileRoutes);
+// File retrieval — NetX requires the API token here too, thumbnails included
+app.use('/api/file', requireAuth, fileRoutes);
 
 // Import endpoints
 app.use('/api/import', requireAuth, importRoutes);
