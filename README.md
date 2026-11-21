@@ -156,6 +156,8 @@ GET /api/file/asset/:id/preview   → Preview
 GET /api/file/asset/:id/zoom      → Zoom
 ```
 
+Like the real NetX API, file requests need the `Authorization: apiToken <token>` header. Without it the mock answers 401, so a client that forgets the token fails here too.
+
 Proxy URL pattern used by the module:
 ```
 GET /view/0000/t_101.jpg  → Thumbnail placeholder

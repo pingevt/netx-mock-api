@@ -661,6 +661,19 @@
       return [];
     }
 
+    // File routes need the API token, which an <img> tag cannot send, so fetch the image and show it from a blob URL.
+    async function loadThumb(img, url) {
+      if (!url) return;
+      try {
+        const response = await fetch(url, { headers: { Authorization: `apiToken ${tokenInput.value}` } });
+        if (!response.ok) return;
+        img.addEventListener('load', () => URL.revokeObjectURL(img.src), { once: true });
+        img.src = URL.createObjectURL(await response.blob());
+      } catch (error) {
+        // Leave the image empty; the response box shows request errors.
+      }
+    }
+
     function renderGallery(items) {
       gallery.innerHTML = '';
       const assets = extractAssets(items);
@@ -685,7 +698,7 @@
           thumb.className = 'thumb';
           thumb.alt = asset.name || asset.fileName || `Asset ${asset.id}`;
           thumb.loading = 'lazy';
-          thumb.src = thumbUrl;
+          loadThumb(thumb, thumbUrl);
         }
         else {
           thumb = document.createElement('div');
